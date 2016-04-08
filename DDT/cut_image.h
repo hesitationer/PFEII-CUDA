@@ -9,7 +9,7 @@
 //**********************************************
 // typedef a Cell of pointer to Open CV matrixes
 //**********************************************
-typedef utilities::Cell<cv::Mat*> MatrixPTRCell;
+typedef utilities::Cell< const cv::Mat > MatrixRefCell;
 
 //************************************************************
 // cut given images in blocs of size sBloc*sBloc
@@ -20,9 +20,12 @@ typedef utilities::Cell<cv::Mat*> MatrixPTRCell;
 // sBloc      : bloc size
 // overlap    : use overlapping between image blocs (y/n)
 // normalize  : normalize image
-// @return    : 0 if everything ok, else 1, 2, 3.. 
+// @return    : 0 if everything ok, else 1, 2, 3..
+// @note      : Mat holded in imageBlocs ceil are dynamically
+//              allocated here, caller responsible of
+//              deallocating memory
 //*************************************************************
-int cutImage(MatrixPTRCell* imageBlocs, std::string image, int sBloc, bool overlap, bool normalize);
+int cutImage(MatrixRefCell& imageBlocs, std::string image, int sBloc, bool overlap, bool normalize);
 
 //************************************************************
 // rebuild previously cutted image
@@ -35,5 +38,5 @@ int cutImage(MatrixPTRCell* imageBlocs, std::string image, int sBloc, bool overl
 // image      : a pointer to a cv::Mat
 // @return    : 0 if everthing worked as expected
 //************************************************************
-int uncutImage(MatrixPTRCell* imageBlocs, int sBloc, bool overlap, bool normalize, cv::Mat* image);
+int uncutImage(const MatrixRefCell& imageBlocs, int sBloc, bool overlap, bool normalize, cv::Mat* image);
 #endif // H_CUT_IMAGE

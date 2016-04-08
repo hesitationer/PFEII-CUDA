@@ -18,20 +18,20 @@ Cell<T>::~Cell()
 }
 
 template <class T>
-T Cell<T>::operator()(int rowIdx, int colIdx)
+const T& Cell<T>::operator()(int rowIdx, int colIdx) const
 {
     return get(rowIdx, colIdx);
 }
 
 template <class T>
-T Cell<T>::get(int rowIdx, int colIdx)
+const T& Cell<T>::get(int rowIdx, int colIdx) const
 {
     int contentIndex = colIdx + (rowIdx*cols);
     return content.at(contentIndex);
 }
 
 template <class T>
-void Cell<T>::set(int rowIdx, int colIdx, T data)
+void Cell<T>::set(int rowIdx, int colIdx, const T& data)
 {
     int contentIndex = colIdx + (rowIdx*cols);
     content.insert(content.begin()+contentIndex, data);

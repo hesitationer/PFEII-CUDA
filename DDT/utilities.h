@@ -1,11 +1,10 @@
 #ifndef H_UTILITIES
 #define H_UTILITIES
-#include <vector>
 #include <opencv2/core/core.hpp>
 
-//********************************************************
-// Utility class/sctructure used to make some Matlab magic
-//********************************************************
+//***********************************************************
+// Utility classes/sctructures used to make some Matlab magic
+//***********************************************************
 namespace utilities
 {
     //**********************************************
@@ -24,13 +23,13 @@ namespace utilities
 		~Cell();
 
 		// (i,j) cell accessor
-		T operator()(int rowIdx, int colIdx);
+		const T& operator()(int rowIdx, int colIdx) const;
 
 		// common cell accessor
-		T get(int rowIdx, int colIdx);
+		const T& get(int rowIdx, int colIdx) const;
 
         // set value of a cell
-        void set(int rowIdx, int colIdx, T data);
+        void set(int rowIdx, int colIdx, const T& data);
 
         int rows; //<! rows number
         int cols; //<! cols number
@@ -44,11 +43,14 @@ namespace utilities
     // compile some basic types here
     //******************************
     template class Cell < int > ;
+    template class Cell < float > ;
+    template class Cell < double > ;
 
     //***********************************************
     // Compile Cell template code for cv::Mat pointer
     //***********************************************
-    template class Cell < cv::Mat* >;
+    template class Cell < const cv::Mat >;
+    template class Cell < cv::Mat >;
 
 } // namespace utilities
 #endif //H_UTILITIES

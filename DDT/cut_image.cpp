@@ -22,12 +22,12 @@ using namespace utilities;
 //************************************************************
 // cut given images in blocs of size sBloc*sBloc
 //************************************************************
-int cutImage(MatrixPTRCell* cutImage, std::string image, int sBloc, bool overlap, bool normalize)
+int cutImage(MatrixRefCell& cutImage, std::string image, int sBloc, bool overlap, bool normalize)
 {
-	int ret = 0;
+    int ret = 0;
 	(void)normalize; // normalization not implemented yet
 
-	Mat img = imread(image, IMREAD_COLOR);
+    Mat img = imread(image, IMREAD_GRAYSCALE);
 	
 	if (!img.data) // fail to read image
 	{
@@ -60,9 +60,9 @@ int cutImage(MatrixPTRCell* cutImage, std::string image, int sBloc, bool overlap
             for (int j = 0; j < wBlocs; ++j)
             {
                 // caller is responsible to deallocate memory
-                Mat* imgBloc = new Mat(sBloc, sBloc, CV_8UC3);
+                std::auto_ptr<Mat> imgBloc(new Mat(sBloc, sBloc, CV_8UC3));
                 img(Range(i*sBloc, (i + 1)*sBloc), Range(j*sBloc, (j + 1)*sBloc)).copyTo(*imgBloc);
-                cutImage->set(i, j, imgBloc);
+                cutImage.set(i, j, *imgBloc);
             }
         }
 	}
@@ -72,14 +72,14 @@ int cutImage(MatrixPTRCell* cutImage, std::string image, int sBloc, bool overlap
 //************************************************************
 // rebuild previously cutted image
 //************************************************************
-int uncutImage(MatrixPTRCell* imageBlocs, int sBloc, bool overlap, bool normalize, cv::Mat* image)
+int uncutImage(const MatrixRefCell& imageBlocs, int sBloc, bool overlap, bool normalize, cv::Mat* image)
 {
-    for (int i = 0; i < imageBlocs->rows; ++i)
+    for (int i = 0; i < imageBlocs.rows; ++i)
     {
-        for (int j = 0; j < imageBlocs->cols; ++j)
+        for (int j = 0; j < imageBlocs.cols; ++j)
         {
-            Mat* aBlock = imageBlocs->get(i, j);
-            aBlock->copyTo((*image)(Range(i*sBloc, (i + 1)*sBloc), Range(j*sBloc, (j + 1)*sBloc)));
+            const Mat& aBlock = imageBlocs.get(i, j);
+            aBlock.copyTo((*image)(Range(i*sBloc, (i + 1)*sBloc), Range(j*sBloc, (j + 1)*sBloc)));
         }
     }
     return 0;
