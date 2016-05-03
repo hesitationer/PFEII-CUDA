@@ -2,19 +2,21 @@
 #define H_UTILITIES
 #include <opencv2/core/core.hpp>
 
-//***********************************************************
-// Utility classes/sctructures used to make some Matlab magic
-//***********************************************************
+//****************************************
+// Utility classes/sctructures declaration
+//****************************************
 namespace utilities
 {
+    typedef struct {
+        int height;
+        int width;
+    } ROI;
+
     //********************************
     // Interquartile range of a vector
     //********************************
     template <typename T>
     T iqr(std::vector<T>& src);
-
-    //template int iqr(std::vector<int>& src);
-    //template float iqr(std::vector<float>& src);
 
     //**********************************************
     // Cell class is lightweight and simple 2D 
@@ -28,8 +30,10 @@ namespace utilities
 		// constructor
 		Cell<T>(int rows, int cols);
 
-        // copy fro cv::Mat constructor
+        // copy from cv::Mat constructor
         Cell<T>(cv::Mat& src);
+
+        Cell<T>(float* src, int cols, int rows);
 
 		// destructor, clear
 		~Cell();

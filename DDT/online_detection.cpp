@@ -7,7 +7,11 @@
 //----------------------------
 #include "online_detection.h"
 #include "kim.h"
-#include <opencv2/core/core.hpp>
+#include "detection.cuh"
+#include "kim.cuh"
+#include "dct8x8.cuh"
+#include "thrust/device_vector.h"
+
 //----------------------------
 // NAMESPACES
 //----------------------------
@@ -22,69 +26,49 @@ using namespace utilities;
 //****************************
 // See header file for details
 //****************************
-int onlineDetection(MatrixRefCell& imageBlocks, int blockSize, vector<float>& refSign, float eta, bool overlap, Mat& markedImage)
+cudaError_t onlineDetection(unsigned char* imageBlocks, const ROI& imageBlocksDims, int blockSize, vector<float>& refSign, float eta, bool overlap, unsigned char* markedImage, const ROI& markedImageDims)
 {
     // overlap not implemented yet
     (void)overlap;
+    cudaError_t ret = cudaSuccess;
 
-    int ret = 0;
-    int blockRows = imageBlocks.rows;
-    int blockCols = imageBlocks.cols;
-    Mat_<double> distanceMat(blockRows, blockCols);
+    int numberOfBlocks = imageBlocksDims.width*imageBlocksDims.height;
+    
+    // phase 1 of kim signature : extract from each image blocks
+    // a 8x8 mean matrix
+    float* meanMatrixes = new float[numberOfBlocks * 64];
+    ret = extractKimSignaturePh1(imageBlocks, imageBlocksDims, blockSize, meanMatrixes);
 
-    // compute block signature and
-    // calcul distance between ref
-    // signature and block signature
-    for (int i = 0; i < blockRows; ++i)
-    {
-        if (ret == 0)
-        {
-            for (int j = 0; j < blockCols; ++j)
-            {
-                const Mat& aBlock = imageBlocks.get(i, j);
-                vector<float> aSign;
-                extractKimSignature(aBlock, blockSize, blockSize, aSign);
-            
-                // compute euclididan distance
-                if (aSign.size() == refSign.size())
-                {
-                    int signDistance = 0;
-                    for (int n = 0; n < refSign.size(); ++n)
-                    {
-                        signDistance += abs(refSign[i] - aSign[i]);
-                    }
-                    distanceMat(i,j) = signDistance;
-                }
-                else // signatures sizes mismatch, error
-                {
-                    ret = 1;
-                    break;
-                }
-            }
-        }
-        else
-            break;
-    }
+    // phase 2 of kim signature : run 2D-DCT of mean matrixes
+    float* dctMeanMatrixes = new float[numberOfBlocks * 64];
+    ret = wrapperDCT2(meanMatrixes, dctMeanMatrixes, numberOfBlocks);
 
-    // compute alpha treshold
-    Scalar distMean = mean(distanceMat);
-    Cell<double> distCell(distanceMat);
-    vector<double> distVector = distCell.getContent();
+    // phase 3 of kim signature : compute kim signatures from DCT matrixes
+    // allocate a vector on device for all the dct matrixes
+    float* kimSignatures = new float[numberOfBlocks*KIM_SIGN_SIZE];
+    ret = extractKimSignaturePh3(dctMeanMatrixes, numberOfBlocks, kimSignatures);
 
-    float alpha = distMean.val[0] + (eta*iqr<double>(distVector));
+    // compute distance between each signature
+    float* distances = new float[numberOfBlocks];
+    float* pRefSign  = new float[KIM_SIGN_SIZE];
+    float distanceMean = 0.0;
+    std::copy(refSign.begin(), refSign.end(), pRefSign);
+
+    ret = computeEuclidianDistancePWrapper(pRefSign, kimSignatures, numberOfBlocks, distances, &distanceMean);
+    distanceMean = distanceMean / (float)numberOfBlocks;
+    vector<float> distanceVec(numberOfBlocks);
+    std::copy(distances, distances+numberOfBlocks, distanceVec.begin());
+    
+    float alpha = distanceMean + (eta*iqr<float>(distanceVec));
 
     // mark defectious blocks
-    for (int i = 0; i < blockRows; ++i)
-    {
-        for (int j = 0; j < blockCols; ++j)
-        {
-            if (distanceMat(i, j) > alpha)
-            {
-                const Mat& aBlock = imageBlocks.get(i, j);
-                aBlock.copyTo( markedImage(Range(i*blockSize, (i + 1)*blockSize), Range(j*blockSize, (j + 1)*blockSize)));
-            }
-        }
-    }
-
+    markImageDefectsPWrapper(alpha, distances, blockSize, imageBlocksDims, imageBlocks, markedImage, markedImageDims);
+    
+    delete[] pRefSign;
+    delete[] distances;
+    delete[] kimSignatures;
+    delete[] meanMatrixes;
+    delete[] dctMeanMatrixes;
+    
     return ret;
 }

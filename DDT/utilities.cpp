@@ -57,6 +57,17 @@ namespace utilities {
         }
     }
 
+    // this one is not template
+    Cell<float>::Cell(float* src, int cols, int rows) :
+        cols(cols),
+        rows(rows)
+    {
+        size = cols*rows;
+        content.reserve(size);
+        //std::copy(std::begin(src), src::begin(src+size), std::begin(content));
+        content.assign(src, src+size);
+    }
+
     template <typename T>
     T iqr(std::vector<T>& src)
     {
@@ -69,7 +80,7 @@ namespace utilities {
         double firstQrtIdx = (len*0.25) - 1;
         double thirdQrtIdx = (len*0.75) - 1;
 
-        float firstQrtVal, thirdQrtVal;
+        T firstQrtVal, thirdQrtVal;
 
         // index not an integer
         if (std::floor(firstQrtIdx) != firstQrtIdx)
@@ -112,6 +123,6 @@ template utilities::Cell < cv::Mat >;
 //***********************************************
 // Cook iqr function templates here
 //***********************************************
-template int utilities::iqr<int>(std::vector<int>& src);
+//template int utilities::iqr<int>(std::vector<int>& src);
 template float utilities::iqr<float>(std::vector<float>& src);
-template double utilities::iqr<double>(std::vector<double>& src);
+//template double utilities::iqr<double>(std::vector<double>& src);

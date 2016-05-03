@@ -4,9 +4,9 @@
 #ifndef H_ONLINE_DETECTION
 #define H_ONLINE_DETECTION
 
-#include <opencv2/core/core.hpp>
 #include "utilities.h"
 #include "cut_image.h"
+#include "driver_types.h"
 
 //*************************************************
 // online_detection parse each image block, extract
@@ -20,6 +20,7 @@
 // @param eta         : constant used to compute defect treshold
 // @param overlap     : do the cell contains overlapping blocks
 // @param markedImage : a Matrix containing defectious blocks at their original position
-int onlineDetection(MatrixRefCell& imageBlocks, int blockSize, std::vector<float>& refSign, float eta, bool overlap, cv::Mat& markedImage);
+// @param markedImageDims : marked image dimension (should be original image size)
+cudaError_t onlineDetection(unsigned char* imageBlocks, const utilities::ROI& imageBlocksDims, int blockSize, std::vector<float>& refSign, float eta, bool overlap, unsigned char* markedImage, const utilities::ROI& markedImageDims);
 
 #endif // H_ONLINE_DETECTION
