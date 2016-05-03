@@ -315,16 +315,6 @@ cudaError_t computeEuclidianDistancePWrapper(float* refSign, float* signs, int n
     return ret;
 }
 
-cudaError_t allocationWrapper(unsigned char* image, ROI imageDims, int blockSize, ROI imageBlocksDims, const vector<float>& refSign, float eta, unsigned char* markedImage)
-{
-
-}
-
-cudaError_t deallocationWrapper()
-{
-
-}
-
 cudaError_t detectionWrapperP(unsigned char* image, ROI imageDims, int blockSize, ROI imageBlocksDims, const vector<float>& refSign, float eta, unsigned char* markedImage)
 {
     cudaError_t ret = cudaSuccess;

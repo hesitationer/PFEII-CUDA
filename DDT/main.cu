@@ -18,7 +18,7 @@ using namespace utilities;
 int main(int argc, char** argv)
 {
     LARGE_INTEGER frequency;
-    LARGE_INTEGER tBegin, tEnd;
+    LARGE_INTEGER tBegin, tEnd, tProcessBegin, tProcessEnd;
     double elapsedTime;
     QueryPerformanceFrequency(&frequency);
 
@@ -34,6 +34,7 @@ int main(int argc, char** argv)
     // buffer holding marked image
     unsigned char markedImg[IMG_SIZE];
 
+    QueryPerformanceCounter(&tProcessBegin);
     for (int i = 1; i <= 26; ++i)
     {
         QueryPerformanceCounter(&tBegin);
@@ -65,5 +66,9 @@ int main(int argc, char** argv)
         printf("Success for image [%d] : %d \n", i, (int)success);
         */
     }
+    QueryPerformanceCounter(&tProcessEnd);
+    elapsedTime = (tProcessEnd.QuadPart - tProcessBegin.QuadPart) * 1000.0 / frequency.QuadPart;
+    printf("Elapsed time for process : %f\n", elapsedTime);
+    return 0;
     return 0;
 }
