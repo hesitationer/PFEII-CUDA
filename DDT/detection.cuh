@@ -73,4 +73,10 @@ __global__ void computeEuclidianDistanceP(float* refSign, float* signs, int numb
 //*********************************************************
 cudaError_t computeEuclidianDistancePWrapper(float* refSign, float* signs, int numberOfsigns, float* distances, float* distanceMean);
 
+//*********************************************************
+// Wrapper for calling all the detection kernels with 
+// removing redundant allocation/deallocation
+//*********************************************************
+cudaError_t detectionWrapperP(unsigned char* image, utilities::ROI imageDims, int blockSize, utilities::ROI imageBlocksDims, const std::vector<float>& refSign, float eta, unsigned char* markedImage);
+
 #endif //H_DETECTION_CUDA

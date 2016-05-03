@@ -5,23 +5,23 @@
 #include "utilities.h"
 #include "kim.h"
 #include "online_detection.h"
-
 #include "detection.cuh"
+
+#include "Windows.h"
 
 using namespace cv;
 using namespace std;
 using namespace utilities;
 
-void printPortion(int* arr, int arrLen)
-{
-    for (int i = 0; i < arrLen; ++i)
-    {
-        printf("%d ", arr[i]);
-    }
-}
+#define IMG_SIZE 98304
 
 int main(int argc, char** argv)
 {
+    LARGE_INTEGER frequency;
+    LARGE_INTEGER tBegin, tEnd;
+    double elapsedTime;
+    QueryPerformanceFrequency(&frequency);
+
     const int blockSize = 32;
     const float eta     = 5.0;
     Cell<const Mat> aMatrixCell(8, 12);
@@ -31,8 +31,12 @@ int main(int argc, char** argv)
     vector<float> refSignature;
     ret = extractKimSignature(aMatrixCell.get(0, 0), blockSize, blockSize, refSignature);
 
+    // buffer holding marked image
+    unsigned char markedImg[IMG_SIZE];
+
     for (int i = 1; i <= 26; ++i)
     {
+        QueryPerformanceCounter(&tBegin);
         ostringstream stringStream;
         stringStream << "E:/jee/cours/GEN5023/code/textile_images/Defect/" << i << ".TIF";
 
@@ -45,16 +49,13 @@ int main(int argc, char** argv)
         blockDims.height = (int)(img.rows / blockSize);
         blockDims.width  = (int)(img.cols / blockSize); 
 
-        // buffer holding image by blocks
-        unsigned char* imageBlocks = new uchar[imgDims.width*imgDims.height];
+        ret = detectionWrapperP(img.data, imgDims, blockSize, blockDims, refSignature, eta, markedImg);
 
-        // buffer holding marked image
-        unsigned char* markedImg = new uchar[imgDims.width*imgDims.height];
+        QueryPerformanceCounter(&tEnd);
+        elapsedTime = (tEnd.QuadPart - tBegin.QuadPart) * 1000.0 / frequency.QuadPart;
+        printf("Elapsed time for image %d : %f\n", i, elapsedTime);
 
-        ret = cutImagePWrapper(img.data, imgDims, blockSize, imageBlocks);
-        
-        ret = onlineDetection(imageBlocks, blockDims, blockSize, refSignature, eta, false, markedImg, imgDims);
-        
+        /*
         ostringstream anotherStream;
         anotherStream << "E:/jee/cours/GEN5023/code/textile_images/results_cuda/img-" << i << "-defect.tiff";
 
@@ -62,9 +63,7 @@ int main(int argc, char** argv)
         bool success = imwrite(anotherStream.str(), markedImgMat);
         cout << anotherStream.str() << endl;
         printf("Success for image [%d] : %d \n", i, (int)success);
-        
-        delete[] markedImg;
-        delete[] imageBlocks;
+        */
     }
     return 0;
 }

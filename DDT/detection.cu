@@ -7,6 +7,7 @@
 //----------------------------
 #include "detection.cuh"
 #include "kim.cuh"
+#include "dct8x8.cuh"
 #include "device_launch_parameters.h"
 #include "math.h"
 
@@ -14,6 +15,7 @@
 // NAMESPACE
 //----------------------------
 using namespace utilities;
+using namespace std;
 
 //----------------------------
 // IMPLEMENTATION
@@ -182,7 +184,8 @@ cudaError_t markImageDefectsPWrapper(float alpha, float* srcDistMatrix, int bloc
     float *devDistMatrix;
     size_t distMatrixSize = (size_t)(imgBlockDims.width*imgBlockDims.height*sizeof(float));
 
-    unsigned char *devImageBlocks, *devMarkedImage;
+    unsigned char* devImageBlocks;
+    unsigned char* devMarkedImage;
     size_t imageSize = (size_t)(imageDims.width*imageDims.height);
 
     // distance matrix
@@ -309,5 +312,130 @@ cudaError_t computeEuclidianDistancePWrapper(float* refSign, float* signs, int n
     cudaFree(devRefSign);
     cudaFree(devSigns);
     cudaFree(devDistanceMean);
+    return ret;
+}
+
+cudaError_t allocationWrapper(unsigned char* image, ROI imageDims, int blockSize, ROI imageBlocksDims, const vector<float>& refSign, float eta, unsigned char* markedImage)
+{
+
+}
+
+cudaError_t deallocationWrapper()
+{
+
+}
+
+cudaError_t detectionWrapperP(unsigned char* image, ROI imageDims, int blockSize, ROI imageBlocksDims, const vector<float>& refSign, float eta, unsigned char* markedImage)
+{
+    cudaError_t ret = cudaSuccess;
+    int imageSize = imageDims.width*imageDims.height;
+    int imageblocksCount = imageBlocksDims.width*imageBlocksDims.height;
+    
+    // 1. call cut image kernel
+    // image alloc
+    unsigned char* devImage;
+    size_t imageSizeMem = (size_t)imageSize;
+    ret = cudaMalloc(&devImage, imageSizeMem);
+    ret = cudaMemcpy(devImage, image, imageSizeMem, cudaMemcpyHostToDevice);
+
+    // image blocks alloc
+    unsigned char* devImageBlocks;
+    ret = cudaMalloc(&devImageBlocks, imageSizeMem);
+
+    // run kernel
+    dim3 threadsDim(CUT_IMG_KERNEL_THREADS, CUT_IMG_KERNEL_THREADS, 1);
+    cutImageP << <1, threadsDim >> >(devImage, imageDims, blockSize, devImageBlocks);
+
+    // 2. kim signature phase 1
+    // mean matrixes
+    float* devMeanMatrixes;
+    size_t meanMatrixesSizeMem = imageblocksCount*MEAN_MATRIX_SIZE*sizeof(float);
+    ret = cudaMalloc(&devMeanMatrixes, meanMatrixesSizeMem);
+
+    // run kernel
+    threadsDim.x = PH1_KERNEL_THREADS;
+    threadsDim.y = PH1_KERNEL_THREADS;
+    extractKimSignaturePhase1 << <1, threadsDim >> >(devImageBlocks, imageBlocksDims, blockSize, devMeanMatrixes);
+
+    // 3. kim signature phase 2 (DCT on mean matrix)
+    // dct matrixes alloc
+    float *devDctMeanMatrixes;
+    ret = cudaMalloc(&devDctMeanMatrixes, meanMatrixesSizeMem);
+
+    // run kernel
+    computeDCT2 << <1, DCT_KERNEL_THREADS >> >(devMeanMatrixes, devDctMeanMatrixes, imageblocksCount);
+
+    // 4. kim signature phase 3
+    // kim signatures
+    float* devKimSignatures;
+    size_t kimSignatureSizeMem = imageblocksCount*KIM_SIGN_SIZE*sizeof(float);
+    ret = cudaMalloc(&devKimSignatures, kimSignatureSizeMem);
+
+    extractKimSignaturePhase3<< <1, PH3_KERNEL_THREADS >> >(devDctMeanMatrixes, imageblocksCount, devKimSignatures);
+
+    // 5. distance euclidian distance compute
+    // ref signature change from vector -> float*
+    float pRefSign[KIM_SIGN_SIZE];
+    float distanceMean = 0.0;
+    std::copy(refSign.begin(), refSign.end(), pRefSign);
+
+    // allocate on device
+    float* devRefSign;
+    size_t refSignSizeMem = KIM_SIGN_SIZE*sizeof(float);
+    ret = cudaMalloc(&devRefSign, refSignSizeMem);
+    ret = cudaMemcpy(devRefSign, pRefSign, refSignSizeMem, cudaMemcpyHostToDevice);
+
+    // distances matrixe
+    float* hostDistances = new float[imageblocksCount];
+    float* devDistanceMatrixes;
+    size_t distancesSizeMem = imageblocksCount*sizeof(float);
+    ret = cudaMalloc(&devDistanceMatrixes, distancesSizeMem);
+    
+    // mean distance holder
+    float* devDistanceMean;
+    ret = cudaMalloc(&devDistanceMean, sizeof(float));
+
+    computeEuclidianDistanceP << <1, CALC_DISTANCE_KERNEL_THREADS >> >(devRefSign, devKimSignatures, imageblocksCount, devDistanceMatrixes, devDistanceMean);
+
+    // copy back some needed data on host
+    ret = cudaMemcpy(hostDistances, devDistanceMatrixes, distancesSizeMem, cudaMemcpyDeviceToHost);
+    if (ret != cudaSuccess) return ret;
+
+    ret = cudaMemcpy(&distanceMean, devDistanceMean, sizeof(float), cudaMemcpyDeviceToHost);
+    if (ret != cudaSuccess) return ret;
+
+    // 6. compute alpha treshold
+    distanceMean = distanceMean / (float)imageblocksCount;
+    vector<float> distanceVec(imageblocksCount);
+    std::copy(hostDistances, hostDistances + imageblocksCount, distanceVec.begin());
+
+    float alpha = distanceMean + (eta*iqr<float>(distanceVec));
+
+    // 7. mark defects on image
+    unsigned char* devMarkedImage;
+    size_t markedImageSizeMem = (size_t)imageSize;
+    ret = cudaMalloc(&devMarkedImage, markedImageSizeMem);
+
+    int distMatrixSize = distancesSizeMem /sizeof(float);
+    threadsDim.x = MARK_IMG_KERNEL_THREADS;
+    threadsDim.y = MARK_IMG_KERNEL_THREADS;
+    markImageDefectsP << < 1, threadsDim >> >(alpha, devDistanceMatrixes, distMatrixSize, imageBlocksDims, blockSize, devImageBlocks, devMarkedImage, imageDims);
+
+    // copy final data back to host
+    ret = cudaMemcpy(markedImage, devMarkedImage, imageSize, cudaMemcpyDeviceToHost);
+
+    // and clean all device memory allocated
+    cudaFree(devImage);
+    cudaFree(devImageBlocks);
+    cudaFree(devMeanMatrixes);
+    cudaFree(devDctMeanMatrixes);
+    cudaFree(devKimSignatures);
+    cudaFree(devRefSign);
+    cudaFree(devDistanceMatrixes);
+    cudaFree(devDistanceMean);
+    cudaFree(devMarkedImage);
+
+    //delete[] pRefSign;
+    delete[] hostDistances;
     return ret;
 }
