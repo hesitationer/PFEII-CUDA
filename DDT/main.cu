@@ -1,7 +1,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
-
+#include "cuda_profiler_api.h"
 #include "utilities.h"
 #include "kim.h"
 #include "online_detection.h"
@@ -35,6 +35,7 @@ int main(int argc, char** argv)
     unsigned char markedImg[IMG_SIZE];
 
     QueryPerformanceCounter(&tProcessBegin);
+    cudaProfilerStart();
     for (int i = 1; i <= 26; ++i)
     {
         QueryPerformanceCounter(&tBegin);
@@ -69,6 +70,6 @@ int main(int argc, char** argv)
     QueryPerformanceCounter(&tProcessEnd);
     elapsedTime = (tProcessEnd.QuadPart - tProcessBegin.QuadPart) * 1000.0 / frequency.QuadPart;
     printf("Elapsed time for process : %f\n", elapsedTime);
-    return 0;
+    cudaProfilerStop();
     return 0;
 }

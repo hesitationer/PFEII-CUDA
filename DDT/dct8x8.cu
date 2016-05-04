@@ -37,7 +37,7 @@ __device__ float computeDCTCoef(int u, int v, float* aMatrix, int offset)
     {
         for (int j = 0; j < COL_NUMBER; ++j)
         {
-            tmp += cosf(ROW_COEF*u*(2 * i + 1))*cosf(COL_COEF*v*(2 * j + 1))*aMatrix[offset + i * ROW_NUMBER + j];
+            tmp += cosf(ROW_COEF*u*(2 * i + 1))*cosf(COL_COEF*v*(2 * j + 1))*aMatrix[i * ROW_NUMBER + j];
         }
     }
     return res*tmp;
@@ -49,19 +49,19 @@ __device__ float computeDCTCoef(int u, int v, float* aMatrix, int offset)
 //*************************************************************
 __global__ void computeDCT2(float* srcMatrixes, float* dstMatrixes, int numberOfMatrixes)
 {
-    // sub matrix starting index and offset
-    int matrixIndex = threadIdx.x*DCT_MATRIX_SIZE;
-    int offset = matrixIndex;
+    // each thread compute dct for a row
+    int threadX = threadIdx.x;
 
-    if (matrixIndex < (numberOfMatrixes*DCT_MATRIX_SIZE))
+    if (threadX < numberOfMatrixes*ROW_NUMBER)
     {
-        for (int u = 0; u < ROW_NUMBER; ++u)
+        int offset = (threadX/ROW_NUMBER)*DCT_MATRIX_SIZE;
+        int startIndex = threadX*ROW_NUMBER;
+        int u = (startIndex - offset)/ROW_NUMBER;
+
+        for (int v = 0; v < COL_NUMBER; ++v)
         {
-            for (int v = 0; v <  COL_NUMBER; ++v)
-            {
-                dstMatrixes[matrixIndex] = computeDCTCoef(u, v, srcMatrixes, offset);
-                ++matrixIndex;
-            }
+            dstMatrixes[startIndex] = computeDCTCoef(u, v, &srcMatrixes[offset], 0);
+            ++startIndex;
         }
     }
 }
