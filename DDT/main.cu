@@ -6,7 +6,7 @@
 #include "kim.h"
 #include "online_detection.h"
 #include "detection.cuh"
-
+#include "cuda_profiler_api.h"
 #include "Windows.h"
 
 using namespace cv;
@@ -35,6 +35,7 @@ int main(int argc, char** argv)
     unsigned char markedImg[IMG_SIZE];
 
     QueryPerformanceCounter(&tProcessBegin);
+
     cudaProfilerStart();
     for (int i = 1; i <= 26; ++i)
     {
@@ -56,7 +57,6 @@ int main(int argc, char** argv)
         QueryPerformanceCounter(&tEnd);
         elapsedTime = (tEnd.QuadPart - tBegin.QuadPart) * 1000.0 / frequency.QuadPart;
         printf("Elapsed time for image %d : %f\n", i, elapsedTime);
-
         /*
         ostringstream anotherStream;
         anotherStream << "E:/jee/cours/GEN5023/code/textile_images/results_cuda/img-" << i << "-defect.tiff";
@@ -67,9 +67,11 @@ int main(int argc, char** argv)
         printf("Success for image [%d] : %d \n", i, (int)success);
         */
     }
-    QueryPerformanceCounter(&tProcessEnd);
-    elapsedTime = (tProcessEnd.QuadPart - tProcessBegin.QuadPart) * 1000.0 / frequency.QuadPart;
-    printf("Elapsed time for process : %f\n", elapsedTime);
+
+	//QueryPerformanceCounter(&tProcessEnd);
+    //elapsedTime = (tProcessEnd.QuadPart - tProcessBegin.QuadPart) * 1000.0 / frequency.QuadPart;
+    //printf("Elapsed time for process : %f\n", elapsedTime);
+
     cudaProfilerStop();
     return 0;
 }
