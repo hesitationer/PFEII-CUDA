@@ -11,7 +11,6 @@
 #include "kim.cuh"
 #include "dct8x8.cuh"
 #include "thrust/device_vector.h"
-
 //----------------------------
 // NAMESPACES
 //----------------------------
@@ -50,11 +49,12 @@ cudaError_t onlineDetection(unsigned char* imageBlocks, const ROI& imageBlocksDi
 
     // compute distance between each signature
     float* distances = new float[numberOfBlocks];
-    float* pRefSign  = new float[KIM_SIGN_SIZE];
+    float pRefSign[KIM_SIGN_SIZE];
     float distanceMean = 0.0;
     std::copy(refSign.begin(), refSign.end(), pRefSign);
 
     ret = computeEuclidianDistancePWrapper(pRefSign, kimSignatures, numberOfBlocks, distances, &distanceMean);
+    
     distanceMean = distanceMean / (float)numberOfBlocks;
     vector<float> distanceVec(numberOfBlocks);
     std::copy(distances, distances+numberOfBlocks, distanceVec.begin());
@@ -64,7 +64,6 @@ cudaError_t onlineDetection(unsigned char* imageBlocks, const ROI& imageBlocksDi
     // mark defectious blocks
     markImageDefectsPWrapper(alpha, distances, blockSize, imageBlocksDims, imageBlocks, markedImage, markedImageDims);
     
-    delete[] pRefSign;
     delete[] distances;
     delete[] kimSignatures;
     delete[] meanMatrixes;
